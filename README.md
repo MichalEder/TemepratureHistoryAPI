@@ -20,13 +20,12 @@ Parameters:
 
 * Response: A JSON object containing:
     
-
-- - station: The station ID.
-- - date: The requested date (formatted as YYYY-MM-DD).
-- - temperature_in_date: The temperature on the specified date.
-- - temperature_mean: The average temperature for the station across the dataset.
-- - temperature_max: The highest recorded temperature for the station.
-- - temperature_min: The lowest recorded temperature for the station.
+  * station: The station ID.
+  * date: The requested date (formatted as YYYY-MM-DD).
+  * temperature_in_date: The temperature on the specified date.
+  * temperature_mean: The average temperature for the station across the dataset. 
+  * temperature_max: The highest recorded temperature for the station. 
+  * temperature_min: The lowest recorded temperature for the station.
 >/api/v1/station
 
 Returns all available temperature data for a selected station.
