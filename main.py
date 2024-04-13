@@ -114,6 +114,32 @@ def annual_data(station, year):
     return result
 
 
+@app.route('/visualization/<station>/<year>')
+def visualization(station, year):
+    """
+    Generates a temperature visualization for a given station and year.
+
+    Args:
+        station (str): The station ID.
+        year (str): The year.
+
+    Returns:
+        Flask send_file response: Sends a PNG image of the visualization.
+    """
+    data = annual_data(station, year)
+    stations_local = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
+    station_name = stations_local.loc[stations_local['STAID'] == int(station)]['STANAME                                 '].squeeze()
+
+    fig = px.line(data, x='date', y='tg', title=f'Visualization for Station {station_name.strip()} - {year}', width=1400, height=800).update_layout(
+    xaxis_title="Date", yaxis_title="Temperature (C)")
+
+    # Save chart as image in memory
+    img = io.BytesIO()
+    fig.write_image(img, format='png')
+    img.seek(0)
+
+    return send_file(img, mimetype='image/png')
+
 
 
 if __name__ == '__main__':
