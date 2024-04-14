@@ -6,6 +6,7 @@ import sqlite3
 import plotly.express as px
 import io
 
+from utils import get_station_data
 
 
 app = Flask(__name__)
@@ -41,23 +42,13 @@ def temperature_in_date(station, date):
     if not date.isdigit() or len(date) != 8:
         return jsonify({'error': 'Invalid date format or length'}), 400
 
-    if not station.isdigit():
-        return jsonify({'error': 'Invalid station format'}), 400
+    df = get_station_data(station)
 
-    conn = sqlite3.connect('data/ecad.db')
-
-    table_name = 'TG_STAID' + str(station).zfill(6)
-    try:
-        query = f'''
-        SELECT * FROM {table_name}
-        '''
-        df = pd.read_sql(query, conn)
-    except pandas.errors.DatabaseError:
-        return jsonify({'error': 'Nonexistent station ID'}), 404
+    if not isinstance(df, pandas.core.frame.DataFrame):
+        return df[0], df[1]
 
     if date not in set(df['date']):
         return jsonify({'error': 'Nonexistent date for this station'}), 404
-
 
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
     df['tg'] = df['tg0'] / 10
@@ -94,15 +85,10 @@ def all_data(station):
     if not station.isdigit():
         return jsonify({'error': 'Invalid station format'}), 400
 
-    conn = sqlite3.connect('data/ecad.db')
-    table_name = 'TG_STAID' + str(station).zfill(6)
-    try:
-        query = f'''
-        SELECT * FROM {table_name}
-        '''
-        df = pd.read_sql(query, conn)
-    except pandas.errors.DatabaseError:
-        return jsonify({'error': 'Nonexistent station ID'}), 404
+    df = get_station_data(station)
+
+    if not isinstance(df, pandas.core.frame.DataFrame):
+        return df[0], df[1]
 
     df['date'] = pd.to_datetime(df['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
@@ -126,19 +112,10 @@ def annual_data(station, year):
     if not year.isdigit() or len(year) != 4:
         return jsonify({'error': 'Invalid year format or length'}), 400
 
+    df = get_station_data(station)
 
-    if not station.isdigit():
-        return jsonify({'error': 'Invalid station format'}), 400
-
-    conn = sqlite3.connect('data/ecad.db')
-    table_name = 'TG_STAID' + str(station).zfill(6)
-    try:
-        query = f'''
-        SELECT * FROM {table_name}
-        '''
-        df = pd.read_sql(query, conn)
-    except pandas.errors.DatabaseError:
-        return jsonify({'error': 'Invalid station ID'}), 404
+    if not isinstance(df, pandas.core.frame.DataFrame):
+        return df[0], df[1]
 
     df['date'] = pd.to_datetime(df['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
