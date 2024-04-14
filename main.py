@@ -1,4 +1,5 @@
-from flask import Flask, render_template, send_file
+import pandas.errors
+from flask import Flask, render_template, send_file,jsonify
 import pandas as pd
 import numpy as np
 import sqlite3
@@ -9,15 +10,14 @@ import io
 
 app = Flask(__name__)
 
-stations = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
-stations = stations[['STAID', 'STANAME                                 ', 'CN']]
-
 
 @app.route('/')
 def index():
     """
     Renders the home page, displaying a table of available weather stations.
     """
+    stations = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
+    stations = stations[['STAID', 'STANAME                                 ', 'CN']]
     return render_template('index.html', data=stations.to_html())
 
 @app.route('/api/v1/<station>/<date>')
@@ -38,12 +38,26 @@ def temperature_in_date(station, date):
             - temperature_max: The maximum recorded temperature for the station.
             - temperature_min: The minimum recorded temperature for the station.
     """
+    if not date.isdigit() or len(date) != 8:
+        return jsonify({'error': 'Invalid date format or length'}), 400
+
+    if not station.isdigit():
+        return jsonify({'error': 'Invalid station format'}), 400
+
     conn = sqlite3.connect('data/ecad.db')
+
     table_name = 'TG_STAID' + str(station).zfill(6)
-    query = f'''
-    SELECT * FROM {table_name}
-    '''
-    df = pd.read_sql(query, conn)
+    try:
+        query = f'''
+        SELECT * FROM {table_name}
+        '''
+        df = pd.read_sql(query, conn)
+    except pandas.errors.DatabaseError:
+        return jsonify({'error': 'Nonexistent station ID'}), 404
+
+    if date not in set(df['date']):
+        return jsonify({'error': 'Nonexistent date for this station'}), 404
+
 
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
     df['tg'] = df['tg0'] / 10
@@ -65,6 +79,7 @@ def temperature_in_date(station, date):
     return response
 
 
+
 @app.route('/api/v1/<station>')
 def all_data(station):
     """
@@ -76,12 +91,19 @@ def all_data(station):
     Returns:
         list: A list of dictionaries, each representing a temperature record.
     """
+    if not station.isdigit():
+        return jsonify({'error': 'Invalid station format'}), 400
+
     conn = sqlite3.connect('data/ecad.db')
     table_name = 'TG_STAID' + str(station).zfill(6)
-    query = f'''
+    try:
+        query = f'''
         SELECT * FROM {table_name}
         '''
-    df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, conn)
+    except pandas.errors.DatabaseError:
+        return jsonify({'error': 'Nonexistent station ID'}), 404
+
     df['date'] = pd.to_datetime(df['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
     df['tg'] = df['tg0'] / 10
@@ -101,12 +123,23 @@ def annual_data(station, year):
     Returns:
         list: A list of dictionaries, each representing a temperature record.
     """
+    if not year.isdigit() or len(year) != 4:
+        return jsonify({'error': 'Invalid year format or length'}), 400
+
+
+    if not station.isdigit():
+        return jsonify({'error': 'Invalid station format'}), 400
+
     conn = sqlite3.connect('data/ecad.db')
     table_name = 'TG_STAID' + str(station).zfill(6)
-    query = f'''
+    try:
+        query = f'''
         SELECT * FROM {table_name}
         '''
-    df = pd.read_sql(query, conn)
+        df = pd.read_sql(query, conn)
+    except pandas.errors.DatabaseError:
+        return jsonify({'error': 'Invalid station ID'}), 404
+
     df['date'] = pd.to_datetime(df['date'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
     df['tg0'] = df['tg'].mask(df['tg'] == -9999, np.nan)
     df['tg'] = df['tg0'] / 10
@@ -126,20 +159,24 @@ def visualization(station, year):
     Returns:
         Flask send_file response: Sends a PNG image of the visualization.
     """
+    if not year.isdigit() or len(year) != 4:
+        return jsonify({'error': 'Invalid date format or length'}), 400
+
     data = annual_data(station, year)
+    if 400 in data or 404 in data:
+        return data[0], data[1]
+
     stations_local = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
     station_name = stations_local.loc[stations_local['STAID'] == int(station)]['STANAME                                 '].squeeze()
 
     fig = px.line(data, x='date', y='tg', title=f'Visualization for Station {station_name.strip()} - {year}', width=1400, height=800).update_layout(
     xaxis_title="Date", yaxis_title="Temperature (C)")
 
-    # Save chart as image in memory
     img = io.BytesIO()
     fig.write_image(img, format='png')
     img.seek(0)
 
     return send_file(img, mimetype='image/png')
-
 
 
 if __name__ == '__main__':
