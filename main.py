@@ -1,8 +1,7 @@
 import pandas.errors
-from flask import Flask, render_template, send_file,jsonify
+from flask import Flask, render_template, send_file, jsonify
 import pandas as pd
 import numpy as np
-import sqlite3
 import plotly.express as px
 import io
 
@@ -20,6 +19,7 @@ def index():
     stations = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
     stations = stations[['STAID', 'STANAME                                 ', 'CN']]
     return render_template('index.html', data=stations.to_html())
+
 
 @app.route('/api/v1/<station>/<date>')
 def temperature_in_date(station, date):
@@ -70,7 +70,6 @@ def temperature_in_date(station, date):
     return response
 
 
-
 @app.route('/api/v1/<station>')
 def all_data(station):
     """
@@ -96,6 +95,7 @@ def all_data(station):
 
     result = df.to_dict(orient='records')
     return result
+
 
 @app.route('/api/v1/annual/<station>/<year>')
 def annual_data(station, year):
@@ -146,8 +146,8 @@ def visualization(station, year):
     stations_local = pd.read_csv('data/data_misc/stations.txt', skiprows=17)
     station_name = stations_local.loc[stations_local['STAID'] == int(station)]['STANAME                                 '].squeeze()
 
-    fig = px.line(data, x='date', y='tg', title=f'Visualization for Station {station_name.strip()} - {year}', width=1400, height=800).update_layout(
-    xaxis_title="Date", yaxis_title="Temperature (C)")
+    fig = px.line(data, x='date', y='tg', title=f'Visualization for Station {station_name.strip()} - {year}',
+                  width=1400, height=800).update_layout(xaxis_title="Date", yaxis_title="Temperature (C)")
 
     img = io.BytesIO()
     fig.write_image(img, format='png')
